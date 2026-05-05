@@ -84,10 +84,53 @@ CREATE VIEW vw_TodayRevenue AS
     WHERE CAST(CheckoutTime AS DATE) = CAST(GETDATE() AS DATE);
 GO
 
+IF NOT EXISTS (
+    SELECT * FROM sys.columns 
+    WHERE object_id = OBJECT_ID('Computers') AND name = 'Notes')
+ALTER TABLE Computers ADD Notes NVARCHAR(255) NULL;
+GO
+
+-- Bảng hội viên
+CREATE TABLE Members (
+    MemberID    INT IDENTITY(1,1) PRIMARY KEY,
+    FullName    NVARCHAR(100) NOT NULL,
+    Phone       NVARCHAR(20)  UNIQUE NOT NULL,
+    Balance     DECIMAL(18,2) DEFAULT 0,      -- Số dư ví
+    Points      INT           DEFAULT 0,       -- Điểm tích lũy
+    JoinDate    DATETIME      DEFAULT GETDATE(),
+    IsActive    BIT           DEFAULT 1
+);
+GO
+
+-- Lịch sử nạp tiền / trừ tiền
+CREATE TABLE MemberTransactions (
+    TxID        INT IDENTITY(1,1) PRIMARY KEY,
+    MemberID    INT           NOT NULL REFERENCES Members(MemberID),
+    Amount      DECIMAL(18,2) NOT NULL,        -- + nạp, - trừ
+    TxType      NVARCHAR(20)  NOT NULL,        -- 'TopUp', 'Payment', 'Refund'
+    Note        NVARCHAR(255) NULL,
+    TxTime      DATETIME      DEFAULT GETDATE()
+);
+GO
+
+
 -- KIỂM TRA LẠI CÁC BẢNG ĐÃ TẠO
 SELECT 'Table' AS Status, name FROM sys.tables;
 USE NetCafeDB;
 GO
+
+-- Liên kết hội viên với phiên chơi
+ALTER TABLE Computers ADD CurrentMemberID INT NULL REFERENCES Members(MemberID);
+GO
+
 -- Thay thế chính xác bằng User hiển thị trong bảng thông báo lỗi của bạn
 ALTER AUTHORIZATION ON DATABASE::NetCafeDB TO [HP\nt803];
+GO
+
+USE NetCafeDB;
+
+IF NOT EXISTS (
+    SELECT * FROM sys.columns 
+    WHERE object_id = OBJECT_ID('Transactions') AND name = 'PaymentMethod')
+ALTER TABLE Transactions ADD PaymentMethod NVARCHAR(30) DEFAULT N'Tiền mặt';
 GO

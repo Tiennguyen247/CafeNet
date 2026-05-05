@@ -169,6 +169,33 @@ namespace CyberCafeManager
                 Enabled = false
             };
             btnService.FlatAppearance.BorderSize = 0;
+
+            var toolTip = new ToolTip { ShowAlways = true };
+            this.MouseClick += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    string current = PC.Notes ?? "";
+                    string input = Microsoft.VisualBasic.Interaction.InputBox(
+                        "Nhập ghi chú cho máy " + PC.Name + ":",
+                        "Ghi chú", current);
+
+                    if (input == null) return; // Bấm Cancel
+                    PC.Notes = input;
+
+                    // Lưu xuống DB
+                    DatabaseHelper.Instance.ExecuteNonQuery(
+                        "UPDATE Computers SET Notes = @note WHERE PCID = @id",
+                        new[]
+                        {
+                new System.Data.SqlClient.SqlParameter("@note", (object)input ?? DBNull.Value),
+                new System.Data.SqlClient.SqlParameter("@id",   PC.ID)
+                        });
+
+                    toolTip.SetToolTip(this, string.IsNullOrEmpty(input) ? "" : "📝 " + input);
+                }
+            };
+
             btnService.Click += (s, e) => OnAddService?.Invoke(PC);
 
             // Thêm tất cả vào UserControl

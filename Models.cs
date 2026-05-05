@@ -58,11 +58,13 @@ namespace CyberCafeManager
         {
             if (StartTime == null) return 0;
 
-            TimeSpan elapsed = DateTime.Now - StartTime.Value;
-            // Tính theo phút, làm tròn lên 1 phút
-            decimal minutes = (decimal)elapsed.TotalMinutes;
-            decimal fee = (minutes / 60m) * HourlyRate;
-            return Math.Round(fee, 0); // Làm tròn đến đồng
+            if (StartTime == null) return 0;
+            TimeSpan elapsed = SimulatedClock.Now - StartTime.Value;
+            decimal minutes = (decimal)Math.Max(0, elapsed.TotalMinutes);
+            if (minutes < 1) return 0;
+            // Làm tròn lên: 1-60 phút = 10k, 61-120 phút = 20k
+            decimal hours = Math.Ceiling(minutes / 60m);
+            return hours * HourlyRate;
         }
 
         // Tổng tiền dịch vụ
@@ -84,7 +86,8 @@ namespace CyberCafeManager
         public string GetElapsedTime()
         {
             if (StartTime == null) return "00:00:00";
-            TimeSpan elapsed = DateTime.Now - StartTime.Value;
+            TimeSpan elapsed = SimulatedClock.Now - StartTime.Value;
+            if (elapsed.TotalSeconds < 0) return "00:00:00";
             return elapsed.ToString(@"hh\:mm\:ss");
         }
 
@@ -93,6 +96,8 @@ namespace CyberCafeManager
         {
             return $"{Name} | {Status} | {HourlyRate:N0} VNĐ/h";
         }
+
+        public string Notes { get; set; }
     }
 
     // ============================================================

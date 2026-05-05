@@ -41,7 +41,7 @@ namespace CyberCafeManager
         // ========================
         public MainDashboard()
         {
-            this.Text = "Cyber Cafe Manager";
+            this.Text = "Net Cafe";
             this.Size = new Size(1024, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(240, 242, 245);
@@ -72,7 +72,7 @@ namespace CyberCafeManager
 
             lblTitle = new Label
             {
-                Text = "☕  CYBER CAFE MANAGER",
+                Text = "☕ NET CAFE",
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 Location = new Point(15, 12),
@@ -122,6 +122,35 @@ namespace CyberCafeManager
             { lblTitle, lblRevenue, lblOnlineInfo, lblDate, btnManageServices, btnReport });
 
             // ---- MAIN AREA (FlowLayoutPanel chứa các UCPC) ----
+            // Thêm nút chuyển màn hình khách, đặt ngay trước pnlHeader.Controls.AddRange
+            var btnCustomer = new Button
+            {
+                Text = "👤",
+                Size = new Size(46, 80),
+                Dock = DockStyle.Right,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(0, 140, 180),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 16),
+                Cursor = Cursors.Hand
+            };
+            btnCustomer.FlatAppearance.BorderSize = 0;
+            btnCustomer.Click += (s, e) =>
+            {
+                Computer activePc = null;
+                foreach (var u in pcControls)
+                    if (u.PC.Status == PCStatus.InUse) { activePc = u.PC; break; }
+
+                if (activePc == null)
+                {
+                    MessageBox.Show("Chưa có máy nào đang hoạt động.",
+                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                new CustomerLoginForm(activePc).Show();
+            };
+            pnlHeader.Controls.Add(btnCustomer); // thêm trước AddRange
+
             var pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
 
             var lblSection = new Label
@@ -174,7 +203,12 @@ namespace CyberCafeManager
                 Font = new Font("Segoe UI", 8),
                 Cursor = Cursors.Hand
             };
-            btnRefresh.Click += (s, e) => LoadPCs();
+            btnRefresh.Click += (s, e) =>
+            {
+                SimulatedClock.AdvanceDay();
+                SetStatus($"⏭ Chuyển sang ngày {SimulatedClock.Now:dd/MM/yyyy}");
+                LoadPCs();
+            };
 
             pnlFooter.Controls.AddRange(new Control[] { lblStatus, btnRefresh });
 
@@ -221,6 +255,7 @@ namespace CyberCafeManager
                     pc.ID = Convert.ToInt32(row["PCID"]);
                     pc.Name = row["PCName"].ToString();
                     pc.HourlyRate = Convert.ToDecimal(row["HourlyRate"]);
+                    pc.Notes = dt.Columns.Contains("Notes") && row["Notes"] != DBNull.Value ? row["Notes"].ToString() : "";
 
                     // Nếu đang dùng → lấy StartTime từ DB
                     int status = Convert.ToInt32(row["Status"]);
@@ -244,6 +279,7 @@ namespace CyberCafeManager
                         }
                     }
 
+
                     // Tạo UserControl và đăng ký events
                     var ucpc = new UCPC(pc);
                     ucpc.OnStartSession += HandleStartSession;
@@ -255,7 +291,7 @@ namespace CyberCafeManager
                 }
 
                 UpdateHeader();
-                SetStatus("✔ Đã tải " + pcControls.Count + " máy");
+                lblDate.Text = SimulatedClock.DisplayDate;
             }
             catch (Exception ex)
             {
@@ -424,34 +460,9 @@ namespace CyberCafeManager
         // ============================================================
         private void BtnReport_Click(object sender, EventArgs e)
         {
-            try
-            {
-                DataTable dt = db.ExecuteQuery(@"
-                    SELECT TOP 10 
-                        c.PCName, 
-                        t.TotalAmount, 
-                        CONVERT(nvarchar, t.CheckoutTime, 103) + ' ' + CONVERT(nvarchar, t.CheckoutTime, 108) AS [Thời gian],
-                        t.Note
-                    FROM Transactions t
-                    INNER JOIN Computers c ON t.PCID = c.PCID
-                    ORDER BY t.CheckoutTime DESC");
-
-                string report = "=== 10 GIAO DỊCH GẦN NHẤT ===\n\n";
-                foreach (DataRow row in dt.Rows)
-                {
-                    report += $"[{row["Thời gian"]}] {row["PCName"]}: {Convert.ToDecimal(row["TotalAmount"]):N0} VNĐ\n";
-                }
-
-                if (dt.Rows.Count == 0)
-                    report += "(Chưa có giao dịch nào hôm nay)";
-
-                MessageBox.Show(report, "Báo cáo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Lỗi báo cáo: " + ex.Message);
-            }
+            new ReportForm().ShowDialog();
         }
+
 
         // ============================================================
         // CẬP NHẬT HEADER

@@ -1,0 +1,2 @@
+﻿USE NetCafeDB;
+ALTER TABLE Computers ADD Notes NVARCHAR(255) NULL;

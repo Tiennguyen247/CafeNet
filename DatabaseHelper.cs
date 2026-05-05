@@ -80,9 +80,17 @@ namespace CyberCafeManager
         // 1. Sửa lỗi thiếu GetTodayRevenue (Khớp với bảng Transactions của bạn)
         public decimal GetTodayRevenue()
         {
-            string sql = "SELECT ISNULL(SUM(TotalAmount), 0) FROM Transactions WHERE CAST(CheckoutTime AS DATE) = CAST(GETDATE() AS DATE)";
-            var result = ExecuteScalar(sql);
-            return result != null && result != DBNull.Value ? Convert.ToDecimal(result) : 0;
+            string sql = @"SELECT ISNULL(SUM(TotalAmount), 0) 
+                   FROM Transactions 
+                   WHERE CAST(CheckoutTime AS DATE) = @today";
+
+            var result = ExecuteScalar(sql, new[]
+            {
+        new SqlParameter("@today", SimulatedClock.Now.Date)
+    });
+
+            return result != null && result != DBNull.Value
+                ? Convert.ToDecimal(result) : 0;
         }
 
         // 2. Sửa lỗi thiếu GetUnpaidOrders (Khớp với bảng OrderItems của bạn)
@@ -114,6 +122,48 @@ namespace CyberCafeManager
         public DataTable GetAllServices()
         {
             return ExecuteQuery("SELECT * FROM Services WHERE IsActive = 1 ORDER BY ServiceName");
+        }
+
+        // Doanh thu theo từng ngày trong khoảng thời gian
+        public DataTable GetRevenueByDate(DateTime from, DateTime to)
+        {
+            string sql = @"
+        SELECT 
+            CAST(CheckoutTime AS DATE)  AS Ngay,
+            COUNT(*)                    AS SoPhien,
+            SUM(TotalAmount)            AS DoanhThu
+        FROM Transactions
+        WHERE CheckoutTime >= @from AND CheckoutTime <= @to
+        GROUP BY CAST(CheckoutTime AS DATE)
+        ORDER BY Ngay";
+
+            return ExecuteQuery(sql, new[]
+            {
+        new SqlParameter("@from", from.Date),
+        new SqlParameter("@to",   to.Date.AddDays(1).AddSeconds(-1))
+    });
+        }
+
+        // Thống kê dịch vụ đã bán trong khoảng thời gian
+        public DataTable GetServiceStats(DateTime from, DateTime to)
+        {
+            string sql = @"
+        SELECT 
+            s.ServiceName,
+            SUM(oi.Quantity)                AS SoLuong,
+            SUM(oi.Quantity * oi.UnitPrice) AS DoanhThu
+        FROM OrderItems oi
+        JOIN Services s ON oi.ServiceID = s.ServiceID
+        WHERE oi.IsPaid = 1
+          AND oi.OrderTime >= @from AND oi.OrderTime <= @to
+        GROUP BY s.ServiceName
+        ORDER BY DoanhThu DESC";
+
+            return ExecuteQuery(sql, new[]
+            {
+        new SqlParameter("@from", from.Date),
+        new SqlParameter("@to",   to.Date.AddDays(1).AddSeconds(-1))
+    });
         }
     }
 }

@@ -19,7 +19,6 @@ namespace CyberCafeManager
         // null nếu mở để quản lý, khác null nếu mở để gọi đồ
         private Computer _currentPC;
         private bool IsOrderMode => _currentPC != null;
-
         private DatabaseHelper db = DatabaseHelper.Instance;
 
         // Controls
