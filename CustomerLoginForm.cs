@@ -75,7 +75,26 @@ namespace CyberCafeManager
             btnLogin.FlatAppearance.BorderColor = Color.FromArgb(0, 150, 200);
             btnLogin.Click += (s, e) =>
             {
-                new CustomerDashboard(_pc).Show();
+                string phone = txtPhone.Text.Trim();
+                Member member = null;
+
+                // Tìm đúng SĐT trong DB
+                var dt = DatabaseHelper.Instance.GetMemberByPhone(phone);
+                if (dt.Rows.Count > 0)
+                {
+                    var row = dt.Rows[0];
+                    member = new Member
+                    {
+                        MemberID = Convert.ToInt32(row["MemberID"]),
+                        FullName = row["FullName"].ToString(),
+                        Phone = row["Phone"].ToString(),
+                        Balance = Convert.ToDecimal(row["Balance"]),
+                        Points = Convert.ToInt32(row["Points"])
+                    };
+                    _pc.CurrentMember = member; // Gắn vào máy
+                }
+
+                new CustomerDashboard(_pc, member).Show();
                 this.Close();
             };
 

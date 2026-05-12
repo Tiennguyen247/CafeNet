@@ -7,7 +7,7 @@ namespace CyberCafeManager
         private static DateTime _base = DateTime.Now;
         private static TimeSpan _offset = TimeSpan.Zero;
 
-        public static DateTime Now => _base + _offset;
+        public static DateTime Now => DateTime.Now + _offset;
 
         public static void AdvanceDay() => _offset += TimeSpan.FromDays(1);
 

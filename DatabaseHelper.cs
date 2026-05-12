@@ -165,5 +165,61 @@ namespace CyberCafeManager
         new SqlParameter("@to",   to.Date.AddDays(1).AddSeconds(-1))
     });
         }
+
+        // Tìm chính xác theo SĐT (dùng cho login)
+        // ============================================================
+        // HỘI VIÊN — các method còn thiếu
+        // ============================================================
+
+        // Lấy tất cả hội viên đang active
+        public DataTable GetAllMembers()
+        {
+            return ExecuteQuery(
+                "SELECT * FROM Members WHERE IsActive = 1 ORDER BY FullName");
+        }
+
+        // Tìm hội viên theo SĐT (LIKE — dùng cho ô search)
+        public DataTable FindMemberByPhone(string phone)
+        {
+            return ExecuteQuery(
+                "SELECT * FROM Members WHERE Phone LIKE @phone AND IsActive = 1",
+                new[] { new SqlParameter("@phone", "%" + phone + "%") });
+        }
+
+        // Tìm chính xác theo SĐT (dùng cho login màn hình khách)
+        public DataTable GetMemberByPhone(string phone)
+        {
+            return ExecuteQuery(
+                "SELECT * FROM Members WHERE Phone = @phone AND IsActive = 1",
+                new[] { new SqlParameter("@phone", phone) });
+        }
+
+        // Nạp tiền vào ví hội viên
+        public void TopUpMember(int memberId, decimal amount, string note)
+        {
+            // Cộng tiền vào Balance, cộng điểm (1 điểm mỗi 10k)
+            ExecuteNonQuery(
+                @"UPDATE Members 
+          SET Balance = Balance + @amount,
+              Points  = Points  + @pts
+          WHERE MemberID = @id",
+                new[]
+                {
+            new SqlParameter("@amount", amount),
+            new SqlParameter("@pts",    (int)(amount / 10000)),
+            new SqlParameter("@id",     memberId)
+                });
+
+            // Ghi vào lịch sử giao dịch
+            ExecuteNonQuery(
+                @"INSERT INTO MemberTransactions (MemberID, Amount, TxType, Note)
+          VALUES (@id, @amt, 'TopUp', @note)",
+                new[]
+                {
+            new SqlParameter("@id",   memberId),
+            new SqlParameter("@amt",  amount),
+            new SqlParameter("@note", note)
+                });
+        }
     }
 }

@@ -123,6 +123,21 @@ namespace CyberCafeManager
 
             // ---- MAIN AREA (FlowLayoutPanel chứa các UCPC) ----
             // Thêm nút chuyển màn hình khách, đặt ngay trước pnlHeader.Controls.AddRange
+            var btnMember = new Button
+            {
+                Text = "👥  Hội Viên",
+                Location = new Point(690, 15),
+                Size = new Size(110, 50),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(0, 100, 160),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnMember.FlatAppearance.BorderSize = 0;
+            btnMember.Click += (s, e) => new MemberForm().ShowDialog();
+            pnlHeader.Controls.Add(btnMember);
+
             var btnCustomer = new Button
             {
                 Text = "👤",
@@ -340,7 +355,7 @@ namespace CyberCafeManager
                     "UPDATE Computers SET Status = 1, StartTime = @now WHERE PCID = @id",
                     new[]
                     {
-                        new SqlParameter("@now", DateTime.Now),
+                        new SqlParameter("@now", SimulatedClock.Now),
                         new SqlParameter("@id",  pc.ID)
                     });
 

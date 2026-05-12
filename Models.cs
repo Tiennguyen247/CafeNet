@@ -31,6 +31,7 @@ namespace CyberCafeManager
         public DateTime? StartTime { get; set; }     // Null khi máy trống
         public decimal HourlyRate { get; set; } = 10000; // 10,000 VNĐ/giờ
         public bool IsVip { get; set; } = false;
+        public Member CurrentMember { get; set; } = null; // Hội viên đang dùng máy
 
         // Danh sách đồ ăn đã gọi trong phiên hiện tại
         public List<OrderItem> Orders { get; set; } = new List<OrderItem>();
@@ -41,7 +42,7 @@ namespace CyberCafeManager
         public virtual void StartSession()
         {
             Status = PCStatus.InUse;
-            StartTime = DateTime.Now;
+            StartTime = SimulatedClock.Now;
             Orders.Clear(); // Xóa orders cũ
         }
 
@@ -58,13 +59,17 @@ namespace CyberCafeManager
         {
             if (StartTime == null) return 0;
 
-            if (StartTime == null) return 0;
             TimeSpan elapsed = SimulatedClock.Now - StartTime.Value;
             decimal minutes = (decimal)Math.Max(0, elapsed.TotalMinutes);
-            if (minutes < 1) return 0;
-            // Làm tròn lên: 1-60 phút = 10k, 61-120 phút = 20k
-            decimal hours = Math.Ceiling(minutes / 60m);
-            return hours * HourlyRate;
+            if (minutes < 0.1m) return 0;
+
+            // Chia giờ thành 10 đơn vị nhỏ, mỗi đơn vị = 6 phút
+            // 10k/h → mỗi 6 phút = 1,000 VND; VIP 15k/h → mỗi 6 phút = 1,500 VND
+            decimal unitMinutes = 6m;                  // 6 phút / đơn vị
+            decimal unitPrice = HourlyRate / 10m;    // 1,000 VND / đơn vị
+
+            decimal units = Math.Ceiling(minutes / unitMinutes);
+            return units * unitPrice;
         }
 
         // Tổng tiền dịch vụ
@@ -154,5 +159,22 @@ namespace CyberCafeManager
         public bool IsActive { get; set; } = true;
 
         public override string ToString() => $"{ServiceName} - {Price:N0} VNĐ (Kho: {Stock})";
+    }
+
+    // ============================================================
+    // CLASS: Member - Hội viên quán net
+    // ============================================================
+    public class Member
+    {
+        public int MemberID { get; set; }
+        public string FullName { get; set; }
+        public string Phone { get; set; }
+        public decimal Balance { get; set; }
+        public int Points { get; set; }
+        public DateTime JoinDate { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public override string ToString() =>
+            $"{FullName} | {Phone} | Số dư: {Balance:N0} VNĐ | Điểm: {Points}";
     }
 }

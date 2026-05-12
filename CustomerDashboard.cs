@@ -14,10 +14,12 @@ namespace CyberCafeManager
 
         private Label lblPCName, lblTotal, lblTimeUsed,
                       lblAmountUsed, lblTimeLeft, lblBalance;
+        private Member _member;
 
-        public CustomerDashboard(Computer pc)
+        public CustomerDashboard(Computer pc, Member member = null)
         {
             _pc = pc;
+            _member = member;
             InitializeComponents();
             UpdateInfo();
             StartTimer();
@@ -196,6 +198,12 @@ namespace CyberCafeManager
             lblAmountUsed.Text = fee.ToString("N0") + " VNĐ";
             lblTimeLeft.Text = "∞";
             lblBalance.Text = "0 VNĐ";
+
+            if (_member != null)
+            {
+                lblPCName.Text = _member.FullName;
+                lblBalance.Text = $"Số dư ví: {_member.Balance:N0} VNĐ";
+            }
         }
 
         private void StartTimer()
