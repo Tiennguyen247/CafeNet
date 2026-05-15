@@ -212,8 +212,13 @@ namespace CyberCafeManager
                                  : rdoTransfer.Checked ? "Chuyển khoản"
                                  : "Tiền mặt";
 
-                string sql = @"INSERT INTO Transactions (PCID, TimeFee, ServiceFee, TotalAmount, Note, PaymentMethod)
-                               VALUES (@pcId, @timeFee, @serviceFee, @total, @note, @pay)";
+                // ĐỔI THÀNH (thêm CheckoutTime):
+                string sql = @"
+    INSERT INTO Transactions (PCID, TimeFee, ServiceFee, TotalAmount, Note, PaymentMethod, CheckoutTime)
+    VALUES (@pcId, @timeFee, @serviceFee, @total, @note, @pay, @checkoutTime)";
+
+                // Và thêm parameter này vào mảng:
+                new SqlParameter("@checkoutTime", SimulatedClock.Now);
 
                 db.ExecuteNonQuery(sql, new[]
                 {

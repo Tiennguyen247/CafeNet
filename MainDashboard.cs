@@ -1,11 +1,5 @@
 ﻿// ============================================================
 // MainDashboard.cs - Form chính của ứng dụng
-// Hiển thị tất cả máy tính, header doanh thu, timer live
-//
-// CÁCH TẠO TRONG VISUAL STUDIO:
-//   Project → Add → New Item → Windows Form
-//   Đặt tên: MainDashboard.cs
-//   XÓA hết code trong .cs và .Designer.cs, paste code này vào
 // ============================================================
 
 using System;
@@ -19,26 +13,17 @@ namespace CyberCafeManager
 {
     public class MainDashboard : Form
     {
-        // ========================
-        // CONTROLS
-        // ========================
         private Panel pnlHeader;
         private Label lblTitle, lblRevenue, lblOnlineInfo, lblDate;
-        private FlowLayoutPanel flowPCs;       // Grid chứa các UCPC
+        private FlowLayoutPanel flowPCs;
         private Panel pnlFooter;
         private Label lblStatus;
         private Button btnManageServices, btnReport, btnRefresh;
-        private System.Windows.Forms.Timer timerLive; // Timer cập nhật mỗi giây
+        private System.Windows.Forms.Timer timerLive;
 
-        // Danh sách tất cả UCPC controls trên màn hình
         private List<UCPC> pcControls = new List<UCPC>();
-
-        // DB helper (Singleton)
         private DatabaseHelper db = DatabaseHelper.Instance;
 
-        // ========================
-        // CONSTRUCTOR
-        // ========================
         public MainDashboard()
         {
             this.Text = "Net Cafe";
@@ -48,17 +33,11 @@ namespace CyberCafeManager
             this.MinimumSize = new Size(800, 600);
             this.Font = new Font("Segoe UI", 9);
 
-            // Icon (nếu có file icon)
-            // this.Icon = new Icon("Resources/icon.ico");
-
-            BuildUI();       // Tạo giao diện
-            LoadPCs();       // Load máy từ DB
-            StartTimer();    // Bắt đầu đếm giây
+            BuildUI();
+            LoadPCs();
+            StartTimer();
         }
 
-        // ============================================================
-        // XÂY DỰNG GIAO DIỆN
-        // ============================================================
         private void BuildUI()
         {
             // ---- HEADER ----
@@ -66,7 +45,7 @@ namespace CyberCafeManager
             {
                 Dock = DockStyle.Top,
                 Height = 80,
-                BackColor = Color.FromArgb(18, 40, 76), // Xanh đêm
+                BackColor = Color.FromArgb(18, 40, 76),
                 Padding = new Padding(15, 0, 15, 0)
             };
 
@@ -99,17 +78,17 @@ namespace CyberCafeManager
 
             lblDate = new Label
             {
-                Text = DateTime.Now.ToString("dddd, dd/MM/yyyy"),
+                Text = SimulatedClock.DisplayDate,
                 ForeColor = Color.FromArgb(180, 200, 230),
                 Font = new Font("Segoe UI", 9),
                 AutoSize = true
             };
             lblDate.Location = new Point(this.ClientSize.Width - lblDate.PreferredWidth - 120, 14);
-            this.Resize += (s, e) => {
+            this.Resize += (s, e) =>
+            {
                 lblDate.Location = new Point(this.ClientSize.Width - 260, 14);
             };
 
-            // Nút bên phải header
             btnManageServices = CreateHeaderButton("Quản lý Dịch Vụ", 120, 8);
             btnManageServices.Location = new Point(820, 15);
             btnManageServices.Click += BtnManageServices_Click;
@@ -117,26 +96,6 @@ namespace CyberCafeManager
             btnReport = CreateHeaderButton("📊 Báo Cáo", 100, 8);
             btnReport.Location = new Point(820, 45);
             btnReport.Click += BtnReport_Click;
-
-            pnlHeader.Controls.AddRange(new Control[]
-            { lblTitle, lblRevenue, lblOnlineInfo, lblDate, btnManageServices, btnReport });
-
-            // ---- MAIN AREA (FlowLayoutPanel chứa các UCPC) ----
-            // Thêm nút chuyển màn hình khách, đặt ngay trước pnlHeader.Controls.AddRange
-            var btnMember = new Button
-            {
-                Text = "👥  Hội Viên",
-                Location = new Point(690, 15),
-                Size = new Size(110, 50),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(0, 100, 160),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnMember.FlatAppearance.BorderSize = 0;
-            btnMember.Click += (s, e) => new MemberForm().ShowDialog();
-            pnlHeader.Controls.Add(btnMember);
 
             var btnCustomer = new Button
             {
@@ -164,8 +123,12 @@ namespace CyberCafeManager
                 }
                 new CustomerLoginForm(activePc).Show();
             };
-            pnlHeader.Controls.Add(btnCustomer); // thêm trước AddRange
 
+            pnlHeader.Controls.AddRange(new Control[]
+                { lblTitle, lblRevenue, lblOnlineInfo, lblDate,
+                  btnManageServices, btnReport, btnCustomer });
+
+            // ---- MAIN AREA ----
             var pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
 
             var lblSection = new Label
@@ -220,18 +183,55 @@ namespace CyberCafeManager
             };
             btnRefresh.Click += (s, e) =>
             {
+                // 1. Auto-checkout tất cả máy đang chạy trước khi chuyển ngày
+                foreach (var ucpc in pcControls)
+                {
+                    if (ucpc.PC.Status == PCStatus.InUse && ucpc.PC.StartTime != null)
+                    {
+                        decimal timeFee = ucpc.PC.CalculateTimeFee();
+                        decimal serviceFee = ucpc.PC.GetServiceTotal();
+                        decimal total = timeFee + serviceFee;
+
+                        db.ExecuteNonQuery(
+                            @"INSERT INTO Transactions
+                                (PCID, TimeFee, ServiceFee, TotalAmount, Note, PaymentMethod, CheckoutTime)
+                              VALUES
+                                (@pcId, @timeFee, @serviceFee, @total, @note, N'Tự động', @checkoutTime)",
+                            new[]
+                            {
+                                new SqlParameter("@pcId",         ucpc.PC.ID),
+                                new SqlParameter("@timeFee",      timeFee),
+                                new SqlParameter("@serviceFee",   serviceFee),
+                                new SqlParameter("@total",        total),
+                                new SqlParameter("@checkoutTime", SimulatedClock.Now),
+                                new SqlParameter("@note",
+                                    $"Auto-checkout {ucpc.PC.Name} cuối ngày {SimulatedClock.Now:dd/MM/yyyy}")
+                            });
+
+                        db.ExecuteNonQuery(
+                            "UPDATE OrderItems SET IsPaid = 1 WHERE PCID = @id AND IsPaid = 0",
+                            new[] { new SqlParameter("@id", ucpc.PC.ID) });
+
+                        db.ExecuteNonQuery(
+                            "UPDATE Computers SET Status = 0, StartTime = NULL WHERE PCID = @id",
+                            new[] { new SqlParameter("@id", ucpc.PC.ID) });
+
+                        ucpc.PC.EndSession();
+                    }
+                }
+
+                // 2. Chuyển sang ngày mới
                 SimulatedClock.AdvanceDay();
-                SetStatus($"⏭ Chuyển sang ngày {SimulatedClock.Now:dd/MM/yyyy}");
+                SetStatus($"⏭ Chuyển sang ngày {SimulatedClock.Now:dd/MM/yyyy} — đã lưu doanh thu hôm qua");
                 LoadPCs();
-            };
+            };  // ← đóng btnRefresh.Click
 
             pnlFooter.Controls.AddRange(new Control[] { lblStatus, btnRefresh });
 
-            // Thêm vào Form
             this.Controls.Add(pnlMain);
             this.Controls.Add(pnlHeader);
             this.Controls.Add(pnlFooter);
-        }
+        }  // ← đóng BuildUI()
 
         private Button CreateHeaderButton(string text, int width, int height)
         {
@@ -249,9 +249,6 @@ namespace CyberCafeManager
             return btn;
         }
 
-        // ============================================================
-        // LOAD MACHINES FROM DATABASE
-        // ============================================================
         private void LoadPCs()
         {
             try
@@ -263,23 +260,21 @@ namespace CyberCafeManager
 
                 foreach (DataRow row in dt.Rows)
                 {
-                    // Tạo đúng loại Computer dựa vào IsVip
                     bool isVip = Convert.ToBoolean(row["IsVip"]);
                     Computer pc = isVip ? new VipComputer() : new Computer();
 
                     pc.ID = Convert.ToInt32(row["PCID"]);
                     pc.Name = row["PCName"].ToString();
                     pc.HourlyRate = Convert.ToDecimal(row["HourlyRate"]);
-                    pc.Notes = dt.Columns.Contains("Notes") && row["Notes"] != DBNull.Value ? row["Notes"].ToString() : "";
+                    pc.Notes = dt.Columns.Contains("Notes") && row["Notes"] != DBNull.Value
+                                    ? row["Notes"].ToString() : "";
 
-                    // Nếu đang dùng → lấy StartTime từ DB
                     int status = Convert.ToInt32(row["Status"]);
                     if (status == 1 && row["StartTime"] != DBNull.Value)
                     {
                         pc.Status = PCStatus.InUse;
                         pc.StartTime = Convert.ToDateTime(row["StartTime"]);
 
-                        // Load orders chưa thanh toán của máy này
                         DataTable orders = db.GetUnpaidOrders(pc.ID);
                         foreach (DataRow oRow in orders.Rows)
                         {
@@ -294,8 +289,6 @@ namespace CyberCafeManager
                         }
                     }
 
-
-                    // Tạo UserControl và đăng ký events
                     var ucpc = new UCPC(pc);
                     ucpc.OnStartSession += HandleStartSession;
                     ucpc.OnCheckout += HandleCheckout;
@@ -310,47 +303,33 @@ namespace CyberCafeManager
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Lỗi khi tải dữ liệu máy:\n" + ex.Message,
-                    "Lỗi Database",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Lỗi khi tải dữ liệu máy:\n" + ex.Message,
+                    "Lỗi Database", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        // ============================================================
-        // TIMER: Cập nhật hiển thị mỗi giây
-        // ============================================================
         private void StartTimer()
         {
-            timerLive = new System.Windows.Forms.Timer();
-            timerLive.Interval = 1000; // 1000ms = 1 giây
+            timerLive = new System.Windows.Forms.Timer { Interval = 1000 };
             timerLive.Tick += (s, e) =>
             {
-                // Cập nhật từng UCPC (thời gian + tiền)
                 foreach (var ucpc in pcControls)
                     ucpc.UpdateDisplay();
-
-                // Cập nhật thông tin header
                 UpdateHeader();
             };
             timerLive.Start();
         }
 
-        // ============================================================
-        // XỬ LÝ SỰ KIỆN: MỞ MÁY
-        // ============================================================
         private void HandleStartSession(Computer pc)
         {
             var confirm = MessageBox.Show(
                 $"Mở máy {pc.Name}?\nGiá: {pc.HourlyRate:N0} VNĐ/giờ",
-                "Xác nhận mở máy",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                "Xác nhận mở máy", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (confirm != DialogResult.Yes) return;
 
             try
             {
-                // Cập nhật DB: Status = 1, StartTime = bây giờ
                 db.ExecuteNonQuery(
                     "UPDATE Computers SET Status = 1, StartTime = @now WHERE PCID = @id",
                     new[]
@@ -359,71 +338,51 @@ namespace CyberCafeManager
                         new SqlParameter("@id",  pc.ID)
                     });
 
-                // Cập nhật object trong bộ nhớ
                 pc.StartSession();
-
-                // Tìm UCPC tương ứng và cập nhật hiển thị
-                var ucpc = pcControls.Find(u => u.PC.ID == pc.ID);
-                ucpc?.UpdateDisplay();
-
+                pcControls.Find(u => u.PC.ID == pc.ID)?.UpdateDisplay();
                 UpdateHeader();
                 SetStatus($"✔ Đã mở máy {pc.Name}");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi mở máy: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Lỗi mở máy: " + ex.Message, "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        // ============================================================
-        // XỬ LÝ SỰ KIỆN: TÍNH TIỀN / CHECKOUT
-        // ============================================================
         private void HandleCheckout(Computer pc)
         {
-            // Mở form thanh toán
             var form = new CheckoutForm(pc);
             if (form.ShowDialog() == DialogResult.OK)
             {
-                // Sau khi checkout thành công → reset máy trong DB
                 try
                 {
-                    // Đánh dấu tất cả orders là đã thanh toán
                     db.ExecuteNonQuery(
                         "UPDATE OrderItems SET IsPaid = 1 WHERE PCID = @id AND IsPaid = 0",
                         new[] { new SqlParameter("@id", pc.ID) });
 
-                    // Reset máy về trạng thái trống
                     db.ExecuteNonQuery(
                         "UPDATE Computers SET Status = 0, StartTime = NULL WHERE PCID = @id",
                         new[] { new SqlParameter("@id", pc.ID) });
 
-                    // Cập nhật object trong bộ nhớ
                     pc.EndSession();
-
-                    // Cập nhật UCPC
-                    var ucpc = pcControls.Find(u => u.PC.ID == pc.ID);
-                    ucpc?.UpdateDisplay();
-
+                    pcControls.Find(u => u.PC.ID == pc.ID)?.UpdateDisplay();
                     UpdateHeader();
                     SetStatus($"✔ Đã thanh toán máy {pc.Name}");
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Lỗi checkout: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Lỗi checkout: " + ex.Message, "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
 
-        // ============================================================
-        // XỬ LÝ SỰ KIỆN: GỌI DỊCH VỤ
-        // ============================================================
         private void HandleAddService(Computer pc)
         {
-            // Mở ServiceForm ở chế độ "thêm vào máy"
             var form = new ServiceForm(pc);
             form.ShowDialog();
 
-            // Sau khi form đóng → reload orders cho máy đó
             DataTable orders = db.GetUnpaidOrders(pc.ID);
             pc.Orders.Clear();
             foreach (DataRow row in orders.Rows)
@@ -437,51 +396,19 @@ namespace CyberCafeManager
                     Quantity = Convert.ToInt32(row["Quantity"])
                 });
             }
-
-            // Cập nhật hiển thị UCPC
-            var ucpc = pcControls.Find(u => u.PC.ID == pc.ID);
-            ucpc?.UpdateDisplay();
+            pcControls.Find(u => u.PC.ID == pc.ID)?.UpdateDisplay();
         }
 
-        private void InitializeComponent()
-        {
-            this.SuspendLayout();
-            // 
-            // MainDashboard
-            // 
-            this.ClientSize = new System.Drawing.Size(282, 253);
-            this.Name = "MainDashboard";
-            this.Load += new System.EventHandler(this.MainDashboard_Load);
-            this.ResumeLayout(false);
-
-        }
-
-        private void MainDashboard_Load(object sender, EventArgs e)
-        {
-
-        }
-
-        // ============================================================
-        // QUẢN LÝ DỊCH VỤ (không cần chọn máy)
-        // ============================================================
         private void BtnManageServices_Click(object sender, EventArgs e)
         {
-            var form = new ServiceForm(null); // null = mở để quản lý
-            form.ShowDialog();
+            new ServiceForm(null).ShowDialog();
         }
 
-        // ============================================================
-        // BÁO CÁO ĐƠN GIẢN
-        // ============================================================
         private void BtnReport_Click(object sender, EventArgs e)
         {
             new ReportForm().ShowDialog();
         }
 
-
-        // ============================================================
-        // CẬP NHẬT HEADER
-        // ============================================================
         private void UpdateHeader()
         {
             int online = 0;
@@ -495,15 +422,11 @@ namespace CyberCafeManager
                 decimal revenue = db.GetTodayRevenue();
                 lblRevenue.Text = $"Doanh thu hôm nay: {revenue:N0} VNĐ";
             }
-            catch { /* Bỏ qua nếu lỗi khi update header */ }
+            catch { }
         }
 
-        private void SetStatus(string message)
-        {
-            lblStatus.Text = message;
-        }
+        private void SetStatus(string message) => lblStatus.Text = message;
 
-        // Dọn dẹp timer khi đóng form
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             timerLive?.Stop();
